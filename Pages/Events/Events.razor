@@ -1,0 +1,95 @@
+@page "/events"
+@using EventEaseApp.Models
+@using EventEaseApp.Pages.Events
+@inject EventEaseApp.Services.EventManagerService EventManagerService
+@inject NavigationManager NavigationManager
+
+<h3 class="mb-4">Events Manager</h3>
+
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    <div class="col">
+        <div class="card shadow-sm h-100 d-flex align-items-center justify-content-center border-dashed"
+        style="cursor:pointer;" @onclick="ShowAddForm">
+            <div class="card-body">
+                <h1 class="display-3 text-muted">+</h1>
+                <p class="text-muted">Add Event</p>
+            </div>
+        </div>
+    </div>
+
+    @if (EventManagerService.GetEvents().Any())
+    {
+    @foreach (var evt in EventManagerService.GetEvents())
+        {
+            <div class="col">
+                <EventCard 
+                        Event="evt" EventChanged="@OnEventChanged" OnDelete="() => DeleteEvent(evt.Id)"/>
+            </div>
+        }
+    } 
+    else
+    {
+        <div class="alert alert-info">No events available. Try adding events first.</div>
+    }
+</div>
+
+
+@if (showAddForm)
+{
+    @if (showAddForm)
+    {
+        <EditForm Model="newEvent" OnValidSubmit="AddEvent">
+            <DataAnnotationsValidator/>
+            <ValidationSummary/>
+
+            <div class="mb-3">
+                <InputText class="form-control" @bind-Value="newEvent.EventName" placeholder="Event Name" />
+                <ValidationMessage For="@(() => newEvent.EventName)" />
+            </div>
+
+            <div class="mb-3">
+                <InputTextArea class="form-control" @bind-Value="newEvent.EventDescription" placeholder="Description" />
+                <ValidationMessage For="@(() => newEvent.EventDescription)" />
+            </div>
+
+            <div class="mb-3">
+                <InputDate class="form-control" @bind-Value="newEvent.EventDate" />
+                <ValidationMessage For="@(() => newEvent.EventDate)" />
+            </div>
+
+            <div class="mb-3">
+                <InputText class="form-control" @bind-Value="newEvent.EventLocation" placeholder="Location" />
+                <ValidationMessage For="@(() => newEvent.EventLocation)" />
+            </div>
+
+            <button class="btn btn-primary me-2" type="submit">Save</button>
+            <button class="btn btn-secondary" type="button" @onclick="() => showAddForm=false">Cancel</button>
+        </EditForm>
+    }
+}
+@code {
+    private AppEvent newEvent = new AppEvent
+    {
+        EventDate = DateTime.Now
+    };
+    private bool showAddForm = false;
+
+    private void ShowAddForm()
+    {
+        showAddForm = true;
+    }
+    private void AddEvent()
+    {
+        EventManagerService.AddEvent(newEvent.EventName!,newEvent.EventDescription!,newEvent.EventDate,newEvent.EventLocation!);
+        showAddForm = false;
+    }
+    private void DeleteEvent(int id)
+    { 
+        EventManagerService.DeleteEvent(id);
+    }
+    private void OnEventChanged(AppEvent updatedEvent)
+    {
+        EventManagerService.UpdateEvent(updatedEvent);
+    }
+}

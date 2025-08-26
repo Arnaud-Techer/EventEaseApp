@@ -1,0 +1,24 @@
+.event-card {
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    background-color: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.event-card h2 {
+    margin: 0 0 8px;
+    color: #2c3e50;
+}
+
+.event-card .description {
+    font-style: italic;
+    color: #555;
+    margin-bottom: 8px;
+}
+
+.event-card p {
+    margin: 4px 0;
+    color: #333;
+}

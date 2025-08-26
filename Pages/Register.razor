@@ -1,0 +1,51 @@
+@page "/register"
+@using EventEaseApp.Models
+
+<h3 class="mb-4">Create your Account</h3>
+
+<EditForm Model="@registrationModel" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+
+    <div class="mb-3">
+        <label for="username" class="form-label">Username</label>
+        <InputText id="username" class="form-control" @bind-Value="registrationModel.UserName"/>
+        <ValidationMessage For="@(() => registrationModel.UserName)"/>
+    </div>
+
+    <div class="mb-3">
+        <label for="email" class="form-label">Email</label>
+        <InputText id="email" class="form-control" @bind-Value="registrationModel.Email"/>
+        <ValidationMessage For="@(() => registrationModel.Email)"/>
+    </div>
+
+    <div class="mb-3">
+        <label for="password" class="form-label">Password</label>
+        <InputText id="password" type="password" class="form-control" @bind-Value="registrationModel.Password"/>
+        <ValidationMessage For="@(() => registrationModel.Password)"/>
+    </div>
+
+    <div class="mb-3">
+        <label for="confirmPassword" class="form-label">Confirm Password</label>
+        <InputText id="confirmPassword" type="password" class="form-control" @bind-Value="registrationModel.ConfirmPassword"/>
+        <ValidationMessage For="@(() => registrationModel.ConfirmPassword)"/>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Register</button>
+
+</EditForm>
+
+@if (successMessage != null)
+{
+    <div class="alert alert-success mt-3">@successMessage</div>
+}
+@code {
+    private RegistrationModel registrationModel = new();
+    private string? successMessage;
+
+    private void HandleValidSubmit()
+    {
+        successMessage=$"Welcome, {registrationModel.UserName}!";
+        registrationModel = new();
+    }
+}

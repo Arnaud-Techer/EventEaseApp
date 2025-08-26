@@ -1,0 +1,109 @@
+@page "/attendance/{EventId:int}"
+@using EventEaseApp.Services
+@using EventEaseApp.Models
+@inject AttendanceService AttendanceService
+
+<h3>Attendance Tracker</h3>
+
+@if (roster ==null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!roster.Any())
+{
+    <p>No attendees yet.</p>
+}
+else
+{
+    <table class="table">
+        <thread>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Check-In</th>
+                <th>Check-Out</th>
+                <th>Actions</th>
+            </tr>
+        </thread>
+        <tbody>
+            @foreach(var entry in roster)
+            {
+                <tr>
+                    <td>@entry.Attendee.Name</td>
+                    <td>@entry.Attendee.Email</td>
+                    <td>@entry.Record.Status</td>
+                    <td>@entry.Record.CheckInAt?.ToString("g")</td>
+                    <td>@entry.Record.CheckOutAt?.ToString("g")</td>
+                    <td>
+                        <button class="btn btn-sm btn-success" @onclick="() => MarkPresent(entry.Attendee.Id)">Mark Present</button>
+                        <button class="btn btn-sm btn-warning" @onclick="() => MarkLate(entry.Attendee.Id)">Mark Late</button>
+                        <button class="btn btn-sm btn-warning" @onclick="() => CheckOut(entry.Attendee.Id)">Check-Out</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => Remove(entry.Attendee.Id)">Remove</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+
+@code {
+    [Parameter] public int EventId {get;set;}
+    private List<AttendanceEntry>? roster;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AttendanceService.OnChange += HandleAttendanceChanged;
+        await LoadRoster();
+    }
+    
+    private async void HandleAttendanceChanged()
+    {
+        await LoadRoster();
+        StateHasChanged();
+    }
+
+    private async Task LoadRoster()
+    {
+        roster =  await AttendanceService.GetRosterAsync(EventId);
+        StateHasChanged();
+    }
+
+    private async Task MarkPresent(Guid attendeeId)
+    {
+        await AttendanceService.CheckInAsync(EventId,attendeeId);
+    }
+
+    private async Task MarkLate(Guid attendeeId)
+    {
+        await AttendanceService.CheckInAsync(EventId,attendeeId,true);
+    }
+
+    private async Task CheckOut(Guid attendeeId)
+    {
+        await AttendanceService.CheckOutAsync(EventId,attendeeId);
+    }
+
+    private async Task Remove(Guid attendeeId)
+    {
+        await AttendanceService.RemoveAttendeeAsync(EventId,attendeeId);
+    }
+
+    private async Task ExportCsv()
+    {
+        var csv = await AttendanceService.ExportCsvAsync(EventId);
+        Console.WriteLine(csv);
+    }
+
+    private async Task ExportJson()
+    {
+        var json = await AttendanceService.ExportJsonAsync(EventId);
+        Console.WriteLine(json);
+    }
+
+    public void Dispose()
+    {
+        AttendanceService.OnChange -= HandleAttendanceChanged;
+    }
+}

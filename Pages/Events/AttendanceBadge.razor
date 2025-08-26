@@ -1,0 +1,27 @@
+@using EventEaseApp.Models
+@inject EventEaseApp.Services.AttendanceService AttendanceService
+
+<span class="badge bg-info text-dark">
+    Attendees : @stats.Total (@stats.PercentPresent% present)
+</span>
+
+@code 
+{
+    [Parameter] public int EventId {get;set;}
+    private AttendanceStats stats = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        AttendanceService.OnChange += StateHasChanged;
+        await LoadStats();
+    }
+
+    private async Task LoadStats()
+    {
+        stats = await AttendanceService.GetStatsAsync(EventId);
+    }
+    public void Dispose()
+    {
+        AttendanceService.OnChange -= StateHasChanged;
+    }
+}

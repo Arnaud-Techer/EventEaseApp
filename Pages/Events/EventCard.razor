@@ -1,0 +1,106 @@
+@namespace EventEaseApp.Pages.Events
+@using EventEaseApp.Models
+@inject NavigationManager NavigationManager
+
+@if (Event != null)
+{
+    <div class="card shadow-sm h-100">
+        <div class="card-body">
+            @if (isEditing)
+            {
+                <EditForm Model="editModel" OnValidSubmit="SaveChanges">
+                    <DataAnnotationsValidator/>
+                    <ValidationSummary/>
+
+                    <div class="mb-2">
+                        <InputText class="form-control" @bind-Value="editModel.EventName" placeholder="Event Name" />
+                        <ValidationMessage For="@(() => editModel.EventName)" />
+                    </div>
+
+                    <div class="mb-2">
+                        <InputTextArea class="form-control" @bind-Value="editModel.EventDescription" placeholder="Description" />
+                        <ValidationMessage For="@(() => editModel.EventDescription)" />
+                    </div>
+
+                    <div class="mb-2">
+                        <InputDate class="form-control" @bind-Value="editModel.EventDate" />
+                        <ValidationMessage For="@(() => editModel.EventDate)" />
+                    </div>
+
+                    <div class="mb-2">
+                        <InputText class="form-control" @bind-Value="editModel.EventLocation" placeholder="Location" />
+                        <ValidationMessage For="@(() => editModel.EventLocation)" />
+                    </div>
+
+                    <button class="btn btn-success me-2" type="submit">Save</button>
+                    <button class="btn btn-secondary" type="button" @onclick="CancelEdit">Cancel</button>
+
+                </EditForm>
+            }
+            else
+            {
+                <h5 class="card-title">@Event.EventName</h5>
+                <p class="card-text">@Event.EventDescription</p>
+                <p class="card-text"><strong>Date:</strong> @Event.EventDate.ToShortDateString()</p>
+                <p class="card-text"><strong>Location:</strong> @Event.EventLocation</p>
+                <button class="btn btn-primary me-2" @onclick="() => StartEdit()">Edit</button>
+                <button class="btn btn-danger" @onclick="OnDelete">Delete</button>
+            }
+            
+
+        </div>
+</div>
+}
+else
+{
+    <p>Loading the events...</p>
+}
+
+
+@code {
+    [Parameter]
+    public AppEvent? Event {get;set;}
+    [Parameter]
+    public EventCallback<AppEvent> EventChanged {get;set;}
+    [Parameter]
+    public EventCallback OnDelete {get;set;}
+
+    private bool isEditing = false;
+    private AppEvent? editModel;
+
+    private void StartEdit()
+    {
+        if (Event != null)
+        {
+            editModel = new AppEvent
+            {
+                Id = Event.Id,
+                EventName=Event.EventName,
+                EventDescription=Event.EventDescription,
+                EventDate=Event.EventDate,
+                EventLocation=Event.EventLocation
+            };
+            isEditing = true;
+        } 
+    }
+
+    private async Task SaveChanges()
+    {
+        if (editModel != null)
+        {
+            Event!.EventName = editModel.EventName;
+            Event.EventDescription = editModel.EventDescription;
+            Event.EventDate = editModel.EventDate;
+            Event.EventLocation = editModel.EventLocation;
+            await EventChanged.InvokeAsync(Event);
+        }
+        isEditing = false;
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        editModel = null;
+    }
+
+}
