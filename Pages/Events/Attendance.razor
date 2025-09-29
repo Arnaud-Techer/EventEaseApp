@@ -2,108 +2,369 @@
 @using EventEaseApp.Services
 @using EventEaseApp.Models
 @inject AttendanceService AttendanceService
+@inject EventManagerService EventManagerService
+@inject UserSessionService UserSessionService
+@inject NavigationManager NavigationManager
 
-<h3>Attendance Tracker</h3>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3 class="mb-1">
+                        <i class="bi bi-people"></i>
+                        Attendance Tracker
+                    </h3>
+                    @if (currentEvent != null)
+                    {
+                        <p class="text-muted mb-0">@currentEvent.EventName - @currentEvent.EventDate.ToString("MMM dd, yyyy")</p>
+                    }
+                </div>
+                <div>
+                     <button class="btn btn-outline-secondary me-2" @onclick="NavigateToEvents">
+                        <i class="bi bi-arrow-left"></i> Back to Events
+                    </button>
+                    <button class="btn btn-primary" @onclick="ShowAddAttendeeForm">
+                        <i class="bi bi-person-plus"></i> Add Attendee
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-@if (roster ==null)
-{
-    <p><em>Loading...</em></p>
-}
-else if (!roster.Any())
-{
-    <p>No attendees yet.</p>
-}
-else
-{
-    <table class="table">
-        <thread>
-            <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Check-In</th>
-                <th>Check-Out</th>
-                <th>Actions</th>
-            </tr>
-        </thread>
-        <tbody>
-            @foreach(var entry in roster)
-            {
-                <tr>
-                    <td>@entry.Attendee.Name</td>
-                    <td>@entry.Attendee.Email</td>
-                    <td>@entry.Record.Status</td>
-                    <td>@entry.Record.CheckInAt?.ToString("g")</td>
-                    <td>@entry.Record.CheckOutAt?.ToString("g")</td>
-                    <td>
-                        <button class="btn btn-sm btn-success" @onclick="() => MarkPresent(entry.Attendee.Id)">Mark Present</button>
-                        <button class="btn btn-sm btn-warning" @onclick="() => MarkLate(entry.Attendee.Id)">Mark Late</button>
-                        <button class="btn btn-sm btn-warning" @onclick="() => CheckOut(entry.Attendee.Id)">Check-Out</button>
-                        <button class="btn btn-sm btn-danger" @onclick="() => Remove(entry.Attendee.Id)">Remove</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">@stats.Total</h5>
+                    <p class="card-text small">Total Registered</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-success">@stats.Present</h5>
+                    <p class="card-text small">Present</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-warning">@stats.Late</h5>
+                    <p class="card-text small">Late</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-info">@stats.Left</h5>
+                    <p class="card-text small">Checked Out</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-secondary">@stats.Absent</h5>
+                    <p class="card-text small">Absent</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-dark">@stats.PercentPresent%</h5>
+                    <p class="card-text small">Attendance Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Attendee Form -->
+    @if (showAddForm)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Add New Attendee</h5>
+            </div>
+            <div class="card-body">
+                <EditForm Model="newAttendee" OnValidSubmit="AddAttendee">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Full Name *</label>
+                                <InputText class="form-control" @bind-Value="newAttendee.Name" placeholder="Enter full name" />
+                                <ValidationMessage For="@(() => newAttendee.Name)" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Email Address</label>
+                                <InputText class="form-control" @bind-Value="newAttendee.Email" placeholder="Enter email (optional)" />
+                                <ValidationMessage For="@(() => newAttendee.Email)" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success" type="submit">
+                            <i class="bi bi-person-plus"></i> Add Attendee
+                        </button>
+                        <button class="btn btn-secondary" type="button" @onclick="CancelAddForm">
+                            <i class="bi bi-x"></i> Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <!-- Attendees Table -->
+    @if (roster == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading attendees...</p>
+        </div>
+    }
+    else if (!roster.Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            No attendees registered yet. Click "Add Attendee" to get started.
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Attendees List</h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" @onclick="ExportCsv">
+                        <i class="bi bi-download"></i> Export CSV
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="ExportJson">
+                        <i class="bi bi-download"></i> Export JSON
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Check-In Time</th>
+                                <th>Check-Out Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach(var entry in roster)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2">
+                                                @entry.Attendee.Name.Substring(0, 1).ToUpper()
+                                            </div>
+                                            <strong>@entry.Attendee.Name</strong>
+                                        </div>
+                                    </td>
+                                    <td>@entry.Attendee.Email</td>
+                                    <td>
+                                        @{
+                                            var statusClass = entry.Record.Status switch
+                                            {
+                                                AttendanceStatus.Present => "badge bg-success",
+                                                AttendanceStatus.Late => "badge bg-warning",
+                                                AttendanceStatus.Left => "badge bg-info",
+                                                AttendanceStatus.Excused => "badge bg-secondary",
+                                                _ => "badge bg-light text-dark"
+                                            };
+                                        }
+                                        <span class="@statusClass">@entry.Record.Status</span>
+                                    </td>
+                                    <td>
+                                        @if (entry.Record.CheckInAt.HasValue)
+                                        {
+                                            <span class="text-success">
+                                                <i class="bi bi-check-circle"></i>
+                                                @entry.Record.CheckInAt.Value.ToString("HH:mm")
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Not checked in</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (entry.Record.CheckOutAt.HasValue)
+                                        {
+                                            <span class="text-warning">
+                                                <i class="bi bi-box-arrow-right"></i>
+                                                @entry.Record.CheckOutAt.Value.ToString("HH:mm")
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Not checked out</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            @if (entry.Record.Status != AttendanceStatus.Present && entry.Record.Status != AttendanceStatus.Late)
+                                            {
+                                                <button class="btn btn-outline-success" @onclick="() => MarkPresent(entry.Attendee.Id)" title="Check In">
+                                                    <i class="bi bi-check-circle"></i>
+                                                </button>
+                                                <button class="btn btn-outline-warning" @onclick="() => MarkLate(entry.Attendee.Id)" title="Mark Late">
+                                                    <i class="bi bi-clock"></i>
+                                                </button>
+                                            }
+                                            @if (entry.Record.Status == AttendanceStatus.Present || entry.Record.Status == AttendanceStatus.Late)
+                                            {
+                                                <button class="btn btn-outline-info" @onclick="() => CheckOut(entry.Attendee.Id)" title="Check Out">
+                                                    <i class="bi bi-box-arrow-right"></i>
+                                                </button>
+                                            }
+                                            <button class="btn btn-outline-danger" @onclick="() => Remove(entry.Attendee.Id)" title="Remove">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .avatar-sm {
+        width: 32px;
+        height: 32px;
+        font-size: 0.875rem;
+    }
+</style>
 
 
 @code {
     [Parameter] public int EventId {get;set;}
     private List<AttendanceEntry>? roster;
+    private AttendanceStats stats = new();
+    private AppEvent? currentEvent;
+    private bool showAddForm = false;
+    private Attendee newAttendee = new();
 
     protected override async Task OnInitializedAsync()
     {
         AttendanceService.OnChange += HandleAttendanceChanged;
+        await LoadEvent();
         await LoadRoster();
+        await LoadStats();
     }
     
     private async void HandleAttendanceChanged()
     {
         await LoadRoster();
+        await LoadStats();
         StateHasChanged();
+    }
+
+    private async Task LoadEvent()
+    {
+        var events = EventManagerService.GetEvents();
+        currentEvent = events.FirstOrDefault(e => e.Id == EventId);
     }
 
     private async Task LoadRoster()
     {
-        roster =  await AttendanceService.GetRosterAsync(EventId);
+        roster = await AttendanceService.GetRosterAsync(EventId);
         StateHasChanged();
+    }
+
+    private async Task LoadStats()
+    {
+        stats = await AttendanceService.GetStatsAsync(EventId);
     }
 
     private async Task MarkPresent(Guid attendeeId)
     {
-        await AttendanceService.CheckInAsync(EventId,attendeeId);
+        await AttendanceService.CheckInAsync(EventId, attendeeId);
     }
 
     private async Task MarkLate(Guid attendeeId)
     {
-        await AttendanceService.CheckInAsync(EventId,attendeeId,true);
+        await AttendanceService.CheckInAsync(EventId, attendeeId, true);
     }
 
     private async Task CheckOut(Guid attendeeId)
     {
-        await AttendanceService.CheckOutAsync(EventId,attendeeId);
+        await AttendanceService.CheckOutAsync(EventId, attendeeId);
     }
 
     private async Task Remove(Guid attendeeId)
     {
-        await AttendanceService.RemoveAttendeeAsync(EventId,attendeeId);
+        await AttendanceService.RemoveAttendeeAsync(EventId, attendeeId);
+    }
+
+    private void ShowAddAttendeeForm()
+    {
+        showAddForm = true;
+        newAttendee = new Attendee();
+    }
+
+    private void CancelAddForm()
+    {
+        showAddForm = false;
+        newAttendee = new Attendee();
+    }
+
+    private async Task AddAttendee()
+    {
+        await AttendanceService.AddAttendeeAsync(EventId, newAttendee.Name, newAttendee.Email);
+        showAddForm = false;
+        newAttendee = new Attendee();
     }
 
     private async Task ExportCsv()
     {
         var csv = await AttendanceService.ExportCsvAsync(EventId);
+        // In a real application, you would trigger a download
+        Console.WriteLine("CSV Export:");
         Console.WriteLine(csv);
     }
 
     private async Task ExportJson()
     {
         var json = await AttendanceService.ExportJsonAsync(EventId);
+        // In a real application, you would trigger a download
+        Console.WriteLine("JSON Export:");
         Console.WriteLine(json);
     }
 
     public void Dispose()
     {
         AttendanceService.OnChange -= HandleAttendanceChanged;
+    }
+
+    private void NavigateToEvents()
+    {
+        NavigationManager.NavigateTo("/events");
     }
 }
