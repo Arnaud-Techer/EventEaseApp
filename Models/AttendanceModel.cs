@@ -1,5 +1,6 @@
 namespace EventEaseApp.Models;
 using System;
+using System.ComponentModel.DataAnnotations;
 
 public enum AttendanceStatus
 {
@@ -13,7 +14,13 @@ public enum AttendanceStatus
 public class Attendee
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    
+    [Required(ErrorMessage = "Name is required.")]
+    [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters.")]
     public string Name { get; set; } = string.Empty;
+    
+    [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
+    [StringLength(255, ErrorMessage = "Email cannot exceed 255 characters.")]
     public string? Email { get; set; }
 }
 

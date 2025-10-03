@@ -1,27 +1,112 @@
 @using EventEaseApp.Models
 @inject EventEaseApp.Services.AttendanceService AttendanceService
 
-<span class="badge bg-info text-dark">
-    Attendees : @stats.Total (@stats.PercentPresent% present)
-</span>
+<div class="attendance-badge-container">
+    @if (isEventOngoing)
+    {
+        <!-- Real-time attendance during event -->
+        <div class="row g-1">
+            <div class="col-4">
+                <div class="badge bg-primary w-100">
+                    <div class="small">Total</div>
+                    <div class="fw-bold">@stats.Total</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="badge bg-success w-100">
+                    <div class="small">Present</div>
+                    <div class="fw-bold">@stats.Present</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="badge bg-warning w-100">
+                    <div class="small">Left</div>
+                    <div class="fw-bold">@stats.Left</div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-1">
+            <small class="text-muted">
+                <i class="bi bi-people"></i> 
+                @stats.PercentPresent% attendance rate
+            </small>
+        </div>
+    }
+    else
+    {
+        <!-- Standard badge for upcoming/completed events -->
+        <span class="badge bg-info text-dark">
+            <i class="bi bi-people"></i>
+            @stats.Total registered
+            @if (stats.Total > 0)
+            {
+                <span class="ms-1">(@stats.PercentPresent% expected)</span>
+            }
+        </span>
+    }
+</div>
+
+<style>
+    .attendance-badge-container .badge {
+        font-size: 0.75rem;
+        padding: 0.5rem 0.25rem;
+        text-align: center;
+    }
+    
+    .attendance-badge-container .badge .small {
+        font-size: 0.6rem;
+        opacity: 0.8;
+    }
+    
+    .attendance-badge-container .badge .fw-bold {
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+</style>
 
 @code 
 {
     [Parameter] public int EventId {get;set;}
+    [Parameter] public DateTime? EventDate {get;set;}
+    
     private AttendanceStats stats = new();
+    private bool isEventOngoing = false;
 
     protected override async Task OnInitializedAsync()
     {
-        AttendanceService.OnChange += StateHasChanged;
+        AttendanceService.OnChange += OnAttendanceChanged;
         await LoadStats();
+        UpdateEventStatus();
+    }
+
+    private async void OnAttendanceChanged()
+    {
+        await LoadStats();
+        StateHasChanged();
     }
 
     private async Task LoadStats()
     {
         stats = await AttendanceService.GetStatsAsync(EventId);
     }
+
+    private void UpdateEventStatus()
+    {
+        if (EventDate.HasValue)
+        {
+            var now = DateTime.Now;
+            var eventDate = EventDate.Value;
+            
+            // Consider event ongoing if it's within 1 hour of start time and not more than 8 hours past
+            var eventStart = eventDate.AddHours(-1);
+            var eventEnd = eventDate.AddHours(8);
+            
+            isEventOngoing = now >= eventStart && now <= eventEnd;
+        }
+    }
+
     public void Dispose()
     {
-        AttendanceService.OnChange -= StateHasChanged;
+        AttendanceService.OnChange -= OnAttendanceChanged;
     }
 }

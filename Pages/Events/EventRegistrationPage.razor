@@ -1,0 +1,89 @@
+@page "/events/{EventId:int}/register"
+@using EventEaseApp.Models
+@using EventEaseApp.Services
+@inject EventManagerService EventManagerService
+@inject AttendanceService AttendanceService
+@inject UserSessionService UserSessionService
+@inject NavigationManager NavigationManager
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            @if (currentEvent == null)
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Event not found.
+                </div>
+                 <button class="btn btn-primary" @onclick="NavigateToEvents">
+                    <i class="bi bi-arrow-left"></i> Back to Events
+                </button>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">
+                            <i class="bi bi-person-plus"></i>
+                            Register for: @currentEvent.EventName
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <!-- Event Information -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Event Details</h6>
+                                <p><strong>Date:</strong> @currentEvent.EventDate.ToString("MMMM dd, yyyy")</p>
+                                <p><strong>Time:</strong> @currentEvent.EventDate.ToString("HH:mm")</p>
+                                <p><strong>Location:</strong> @currentEvent.EventLocation</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Description</h6>
+                                <p class="text-muted">@currentEvent.EventDescription</p>
+                            </div>
+                        </div>
+
+                        <!-- Registration Form -->
+                        <EventRegistration EventId="currentEvent.Id" OnRegistrationChanged="OnRegistrationChanged" />
+                    </div>
+                </div>
+
+                <!-- Back Button -->
+                <div class="mt-3">
+                     <button class="btn btn-outline-secondary" @onclick="NavigateToEvents">
+                        <i class="bi bi-arrow-left"></i> Back to Events
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int EventId { get; set; }
+    
+    private AppEvent? currentEvent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEvent();
+    }
+
+    private async Task LoadEvent()
+    {
+        var events = EventManagerService.GetEvents();
+        currentEvent = events.FirstOrDefault(e => e.Id == EventId);
+    }
+
+    private async Task OnRegistrationChanged()
+    {
+        // Refresh the page or show success message
+        StateHasChanged();
+    }
+
+    private void NavigateToEvents()
+    {
+        NavigationManager.NavigateTo("/events"); 
+    }
+}
+

@@ -1,6 +1,9 @@
 @namespace EventEaseApp.Pages.Events
 @using EventEaseApp.Models
+@using EventEaseApp.Services
 @inject NavigationManager NavigationManager
+@inject AttendanceService AttendanceService
+@inject UserSessionService UserSessionService
 
 @if (Event != null)
 {
@@ -39,12 +42,110 @@
             }
             else
             {
-                <h5 class="card-title">@Event.EventName</h5>
-                <p class="card-text">@Event.EventDescription</p>
-                <p class="card-text"><strong>Date:</strong> @Event.EventDate.ToShortDateString()</p>
-                <p class="card-text"><strong>Location:</strong> @Event.EventLocation</p>
-                <button class="btn btn-primary me-2" @onclick="() => StartEdit()">Edit</button>
-                <button class="btn btn-danger" @onclick="OnDelete">Delete</button>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="card-title mb-0">@Event.EventName</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" @onclick="() => StartEdit()"><i class="bi bi-pencil"></i> Edit</a></li>
+                            <li><a class="dropdown-item" href="#" @onclick="OnDelete"><i class="bi bi-trash"></i> Delete</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/attendance/@Event.Id"><i class="bi bi-people"></i> Manage Attendance</a></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <p class="card-text text-muted">@Event.EventDescription</p>
+                
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <small class="text-muted d-block">Date</small>
+                        <strong>@Event.EventDate.ToString("MMM dd, yyyy")</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">Time</small>
+                        <strong>@Event.EventDate.ToString("HH:mm")</strong>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <small class="text-muted d-block">Location</small>
+                    <strong>@Event.EventLocation</strong>
+                </div>
+
+                <!-- Attendance Statistics -->
+                <div class="attendance-stats mb-3">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <div class="text-center p-2 bg-light rounded">
+                                <div class="h6 mb-0 text-primary">@attendanceStats.Total</div>
+                                <small class="text-muted">Registered</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center p-2 bg-light rounded">
+                                <div class="h6 mb-0 text-success">@attendanceStats.Present</div>
+                                <small class="text-muted">Checked In</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center p-2 bg-light rounded">
+                                <div class="h6 mb-0 text-warning">@attendanceStats.Left</div>
+                                <small class="text-muted">Checked Out</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Status and Actions -->
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        @if (isEventOngoing)
+                        {
+                            <span class="badge bg-success">
+                                <i class="bi bi-play-circle"></i> Ongoing
+                            </span>
+                        }
+                        else if (isEventUpcoming)
+                        {
+                            <span class="badge bg-primary">
+                                <i class="bi bi-clock"></i> Upcoming
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-check-circle"></i> Completed
+                            </span>
+                        }
+                    </div>
+                    
+                    <div class="btn-group" role="group">
+                        @if (UserSessionService.IsLoggedIn)
+                        {
+                            @if (isUserRegistered)
+                            {
+                                <button class="btn btn-outline-success btn-sm" disabled>
+                                    <i class="bi bi-check-circle"></i> Registered
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-primary btn-sm" @onclick="ShowRegistrationForm">
+                                    <i class="bi bi-person-plus"></i> Register
+                                </button>
+                            }
+                        }
+                        else
+                        {
+                             <button class="btn btn-outline-primary btn-sm" @onclick="NavigateToLogin">
+                                <i class="bi bi-box-arrow-in-right"></i> Login to Register
+                            </button>
+                        }
+                    </div>
+                </div>
             }
             
 
@@ -67,6 +168,82 @@ else
 
     private bool isEditing = false;
     private AppEvent? editModel;
+    private AttendanceStats attendanceStats = new();
+    private bool isUserRegistered = false;
+    private bool isEventOngoing = false;
+    private bool isEventUpcoming = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Event != null)
+        {
+            await LoadAttendanceStats();
+            await CheckUserRegistration();
+            UpdateEventStatus();
+        }
+        
+        AttendanceService.OnChange += OnAttendanceChanged;
+        UserSessionService.OnChange += OnUserSessionChanged;
+    }
+
+    private async void OnAttendanceChanged()
+    {
+        if (Event != null)
+        {
+            await LoadAttendanceStats();
+            await CheckUserRegistration();
+            StateHasChanged();
+        }
+    }
+
+    private async void OnUserSessionChanged()
+    {
+        if (Event != null)
+        {
+            await CheckUserRegistration();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAttendanceStats()
+    {
+        if (Event != null)
+        {
+            attendanceStats = await AttendanceService.GetStatsAsync(Event.Id);
+        }
+    }
+
+    private async Task CheckUserRegistration()
+    {
+        if (Event != null && UserSessionService.IsLoggedIn && !string.IsNullOrEmpty(UserSessionService.UserName))
+        {
+            var roster = await AttendanceService.GetRosterAsync(Event.Id);
+            isUserRegistered = roster.Any(e => 
+                string.Equals(e.Attendee.Name, UserSessionService.UserName, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(e.Attendee.Email) && 
+                 string.Equals(e.Attendee.Email, UserSessionService.UserName, StringComparison.OrdinalIgnoreCase)));
+        }
+        else
+        {
+            isUserRegistered = false;
+        }
+    }
+
+    private void UpdateEventStatus()
+    {
+        if (Event != null)
+        {
+            var now = DateTime.Now;
+            var eventDate = Event.EventDate;
+            
+            // Consider event ongoing if it's within 2 hours of start time and not more than 8 hours past
+            var eventStart = eventDate.AddHours(-1); // 1 hour before
+            var eventEnd = eventDate.AddHours(8); // 8 hours after
+            
+            isEventOngoing = now >= eventStart && now <= eventEnd;
+            isEventUpcoming = now < eventStart;
+        }
+    }
 
     private void StartEdit()
     {
@@ -93,6 +270,7 @@ else
             Event.EventDate = editModel.EventDate;
             Event.EventLocation = editModel.EventLocation;
             await EventChanged.InvokeAsync(Event);
+            UpdateEventStatus();
         }
         isEditing = false;
     }
@@ -103,4 +281,20 @@ else
         editModel = null;
     }
 
+    private void ShowRegistrationForm()
+    {
+        // Navigate to a registration page or show a modal
+        NavigationManager.NavigateTo($"/events/{Event?.Id}/register");
+    }
+
+    public void Dispose()
+    {
+        AttendanceService.OnChange -= OnAttendanceChanged;
+        UserSessionService.OnChange -= OnUserSessionChanged;
+    }
+
+    private void NavigateToLogin()
+    {
+        NavigationManager.NavigateTo("/login");
+    }
 }

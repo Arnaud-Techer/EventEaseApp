@@ -1,0 +1,177 @@
+@using EventEaseApp.Models
+@using EventEaseApp.Services
+@inject AttendanceService AttendanceService
+@inject UserSessionService UserSessionService
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Register for Event</h5>
+    </div>
+    <div class="card-body">
+        @if (!UserSessionService.IsLoggedIn)
+        {
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                Please log in to register for events.
+            </div>
+        }
+        else
+        {
+            @if (isRegistered)
+            {
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i>
+                    You are registered for this event!
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-danger" @onclick="UnregisterFromEvent">
+                            <i class="bi bi-x-circle"></i> Unregister
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="registrationModel" OnValidSubmit="RegisterForEvent">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label class="form-label">Full Name *</label>
+                        <InputText class="form-control" @bind-Value="registrationModel.FullName" placeholder="Enter your full name" />
+                        <ValidationMessage For="@(() => registrationModel.FullName)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email Address *</label>
+                        <InputText class="form-control" @bind-Value="registrationModel.Email" placeholder="Enter your email" />
+                        <ValidationMessage For="@(() => registrationModel.Email)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <InputText class="form-control" @bind-Value="registrationModel.PhoneNumber" placeholder="Enter your phone number (optional)" />
+                        <ValidationMessage For="@(() => registrationModel.PhoneNumber)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Special Requirements</label>
+                        <InputTextArea class="form-control" @bind-Value="registrationModel.SpecialRequirements" 
+                                     placeholder="Any dietary restrictions, accessibility needs, etc. (optional)" 
+                                     rows="3" />
+                        <ValidationMessage For="@(() => registrationModel.SpecialRequirements)" />
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="registrationModel.AcceptTerms" />
+                        <label class="form-check-label">
+                            I agree to the <a href="#" @onclick="ShowTerms">terms and conditions</a> *
+                        </label>
+                        <ValidationMessage For="@(() => registrationModel.AcceptTerms)" />
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button class="btn btn-primary" type="submit" disabled="@isSubmitting">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            <i class="bi bi-person-plus"></i> Register for Event
+                        </button>
+                    </div>
+                </EditForm>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int EventId { get; set; }
+    [Parameter] public EventCallback OnRegistrationChanged { get; set; }
+
+    private EventRegistrationModel registrationModel = new();
+    private bool isRegistered = false;
+    private bool isSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckRegistrationStatus();
+        UserSessionService.OnChange += OnUserSessionChanged;
+    }
+
+    private async void OnUserSessionChanged()
+    {
+        await CheckRegistrationStatus();
+        StateHasChanged();
+    }
+
+    private async Task CheckRegistrationStatus()
+    {
+        if (UserSessionService.IsLoggedIn && !string.IsNullOrEmpty(UserSessionService.UserName))
+        {
+            var roster = await AttendanceService.GetRosterAsync(EventId);
+            isRegistered = roster.Any(e => 
+                string.Equals(e.Attendee.Name, UserSessionService.UserName, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(e.Attendee.Email) && 
+                 string.Equals(e.Attendee.Email, UserSessionService.UserName, StringComparison.OrdinalIgnoreCase)));
+        }
+        else
+        {
+            isRegistered = false;
+        }
+    }
+
+    private async Task RegisterForEvent()
+    {
+        if (isSubmitting) return;
+        
+        isSubmitting = true;
+        try
+        {
+            await AttendanceService.AddAttendeeAsync(EventId, registrationModel.FullName, registrationModel.Email);
+            isRegistered = true;
+            registrationModel = new(); // Reset form
+            await OnRegistrationChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            // Handle error - you might want to show a toast notification
+            Console.WriteLine($"Registration error: {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task UnregisterFromEvent()
+    {
+        if (UserSessionService.IsLoggedIn && !string.IsNullOrEmpty(UserSessionService.UserName))
+        {
+            var roster = await AttendanceService.GetRosterAsync(EventId);
+            var userEntry = roster.FirstOrDefault(e => 
+                string.Equals(e.Attendee.Name, UserSessionService.UserName, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(e.Attendee.Email) && 
+                 string.Equals(e.Attendee.Email, UserSessionService.UserName, StringComparison.OrdinalIgnoreCase)));
+            
+            if (userEntry != null)
+            {
+                await AttendanceService.RemoveAttendeeAsync(EventId, userEntry.Attendee.Id);
+                isRegistered = false;
+                await OnRegistrationChanged.InvokeAsync();
+            }
+        }
+    }
+
+    private void ShowTerms()
+    {
+        // You can implement a modal or navigate to terms page
+        // For now, just show an alert
+        // You might want to implement a proper modal component
+    }
+
+    public void Dispose()
+    {
+        UserSessionService.OnChange -= OnUserSessionChanged;
+    }
+}
+
