@@ -25,9 +25,15 @@
                         <ValidationMessage For="@(() => editModel.EventDescription)" />
                     </div>
 
-                    <div class="mb-2">
-                        <InputDate class="form-control" @bind-Value="editModel.EventDate" />
-                        <ValidationMessage For="@(() => editModel.EventDate)" />
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Date</label>
+                            <InputDate class="form-control" @bind-Value="editEventDate" />
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Time</label>
+                            <InputText type="time" class="form-control" @bind-Value="editEventTime" />
+                        </div>
                     </div>
 
                     <div class="mb-2">
@@ -49,8 +55,8 @@
                             <i class="bi bi-three-dots-vertical"></i>
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" @onclick="() => StartEdit()"><i class="bi bi-pencil"></i> Edit</a></li>
-                            <li><a class="dropdown-item" href="#" @onclick="OnDelete"><i class="bi bi-trash"></i> Delete</a></li>
+                            <li><button class="dropdown-item" @onclick="() => StartEdit()"><i class="bi bi-pencil"></i> Edit</button></li>
+                            <li><button class="dropdown-item" @onclick="OnDelete"><i class="bi bi-trash"></i> Delete</button></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="/attendance/@Event.Id"><i class="bi bi-people"></i> Manage Attendance</a></li>
                         </ul>
@@ -168,6 +174,8 @@ else
 
     private bool isEditing = false;
     private AppEvent? editModel;
+    private DateTime editEventDate;
+    private string editEventTime = "";
     private AttendanceStats attendanceStats = new();
     private bool isUserRegistered = false;
     private bool isEventOngoing = false;
@@ -249,6 +257,10 @@ else
     {
         if (Event != null)
         {
+            // Initialize separate date and time fields first
+            editEventDate = Event.EventDate.Date;
+            editEventTime = Event.EventDate.ToString("HH:mm");
+            
             editModel = new AppEvent
             {
                 Id = Event.Id,
@@ -265,12 +277,18 @@ else
     {
         if (editModel != null)
         {
-            Event!.EventName = editModel.EventName;
-            Event.EventDescription = editModel.EventDescription;
-            Event.EventDate = editModel.EventDate;
-            Event.EventLocation = editModel.EventLocation;
-            await EventChanged.InvokeAsync(Event);
-            UpdateEventStatus();
+            // Combine date and time
+            if (TimeSpan.TryParse(editEventTime, out var timeSpan))
+            {
+                var combinedDateTime = editEventDate.Add(timeSpan);
+                
+                Event!.EventName = editModel.EventName;
+                Event.EventDescription = editModel.EventDescription;
+                Event.EventDate = combinedDateTime;
+                Event.EventLocation = editModel.EventLocation;
+                await EventChanged.InvokeAsync(Event);
+                UpdateEventStatus();
+            }
         }
         isEditing = false;
     }

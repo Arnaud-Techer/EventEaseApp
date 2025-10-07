@@ -3,6 +3,7 @@
 @using EventEaseApp.Pages.Events
 @inject EventEaseApp.Services.EventManagerService EventManagerService
 @inject NavigationManager NavigationManager
+@implements IDisposable
 
 <h3 class="mb-4">Events Manager</h3>
 
@@ -53,9 +54,16 @@
                 <ValidationMessage For="@(() => newEvent.EventDescription)" />
             </div>
 
-            <div class="mb-3">
-                <InputDate class="form-control" @bind-Value="newEvent.EventDate" />
-                <ValidationMessage For="@(() => newEvent.EventDate)" />
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Date</label>
+                    <InputDate class="form-control" @bind-Value="eventDate" />
+                    <ValidationMessage For="@(() => newEvent.EventDate)" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Time</label>
+                    <InputText type="time" class="form-control" @bind-Value="eventTime" />
+                </div>
             </div>
 
             <div class="mb-3">
@@ -69,11 +77,20 @@
     }
 }
 @code {
-    private AppEvent newEvent = new AppEvent
-    {
-        EventDate = DateTime.Now
-    };
+    private AppEvent newEvent = new AppEvent();
+    private DateTime eventDate = DateTime.Now.Date;
+    private string eventTime = DateTime.Now.ToString("HH:mm");
     private bool showAddForm = false;
+
+    protected override void OnInitialized()
+    {
+        EventManagerService.OnEventsChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        EventManagerService.OnEventsChanged -= StateHasChanged;
+    }
 
     private void ShowAddForm()
     {
@@ -81,7 +98,17 @@
     }
     private void AddEvent()
     {
-        EventManagerService.AddEvent(newEvent.EventName!,newEvent.EventDescription!,newEvent.EventDate,newEvent.EventLocation!);
+        // Combine date and time
+        if (TimeSpan.TryParse(eventTime, out var timeSpan))
+        {
+            var combinedDateTime = eventDate.Add(timeSpan);
+            EventManagerService.AddEvent(newEvent.EventName!, newEvent.EventDescription!, combinedDateTime, newEvent.EventLocation!);
+        }
+        
+        // Reset form
+        newEvent = new AppEvent();
+        eventDate = DateTime.Now.Date;
+        eventTime = DateTime.Now.ToString("HH:mm");
         showAddForm = false;
     }
     private void DeleteEvent(int id)
